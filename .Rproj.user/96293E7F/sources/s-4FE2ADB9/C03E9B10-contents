@@ -1,0 +1,106 @@
+library(nlme)
+
+# You can also do this in RStudio using the "Import Dataset" button
+data <- read.csv("antipsychotic_study.csv",header=T)
+
+
+# Plot outcome variable versus time
+plot(data$time, data$marketshare,
+     ylab = "antipsychotic study",
+     ylim =c(0.1, 0.6),
+     xlab = "yearqtr",
+     type = "l",
+     col = "red",
+     xaxt="n")
+
+
+# Add x-axis year labels
+axis(1, at=1:11, labels = data$yearqtr)
+
+# Add in the points for the figure
+points(data$time, data$marketshare, col="red", pch=20)
+
+
+# Label the weather change
+abline(v=8.5, ity=2)
+
+
+# A preliminary OLS regression
+model_ols = lm(marketshare ~ time + level + trend, data=data)
+
+# See summary of model output
+summary(model_ols)
+
+# Get confidence intervals for coefficients
+confint(model_ols)
+
+
+## Checking for autocorolatoin
+
+## the Durbin-Watson Test
+dwt(model_ols, max.lag=8, alternative="two.sided")
+
+# ACF Plots
+par(mfrow=c(2,1))
+
+#Produce plots
+acf(residuals(model_ols))
+acf(residuals(model_ols), type='partial')
+
+##Use AR(0) and MR(0) in the plot
+
+model_p0 <- gls(marketshare ~ time + level + trend, 
+             data=data,
+             correlation=NULL,
+             method = "ML")
+summary(model_p0)
+
+
+# Model Checking
+model_p1 <- update(model_p0, correlation=corARMA(p=1, form=~time))
+anova(model_p0, model_p1)
+
+model_p1q1 <- update(model_p0, correlation=corARMA(p=0, q=1, form=~time))
+anova(model_p0,model_p1q1)
+
+
+#Plotting the Results
+
+plot(data$time, data$marketshare,
+     ylab = "antipsychotic study",
+     ylim =c(0, 0.6),
+     xlab = "yearqtr",
+     pch = 20,
+     col = "pink",
+     xaxt="n")
+
+# Plot dates on x-axis
+axis(1, at=1:19, labels = data$yearqtr)
+
+# Add line indicating policy start date
+abline(v=8.5, ity="dotted")
+
+# Plot the first line segment
+lines(data$time[1:8], fitted(model_p0)[1:8], col="red", lwd=2)
+
+# Plot the second line segment
+lines(data$time[9:19], fitted(model_p0)[9:19], col="red", lwd=2)
+
+#Add the counterfactual
+segments(1, model_p0$coef[1]+model_p0$coef[2], 19,
+         model_p0$coef[1]+model_p0$coef[2]*19,
+         lty=2,
+         lwd=2,
+         col='red')
+
+pred <- fitted(model_p0)[14]
+pred
+cfac <- model_p0$coef[1] + model_p0$coef[2]*14
+pred - cfac
+
+pred <- fitted(model_p0)[15]
+
+
+cfac <- model_p0$coef[1] + model_p0$coef[2]*15
+
+(pred - cfac) / cfac

@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1670730525860.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "BC76A7C0",
+    "lastKnownWriteTime" : 8026363914660965410,
+    "last_content_update" : 1670730525860,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "E073CAC1",
+        "caption" : "unemployment_data",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=unemployment_data&cache_key=E073CAC1",
+        "displayedObservations" : 21,
+        "environment" : "",
+        "object" : "unemployment_data",
+        "preview" : 0,
+        "totalObservations" : 21,
+        "variables" : 5
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

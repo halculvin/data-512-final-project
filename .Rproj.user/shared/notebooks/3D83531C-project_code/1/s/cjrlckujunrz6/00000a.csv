@@ -1,0 +1,2 @@
+"0","# Plot the second line segment"
+"0","lines(unemployment_data$time[6:21], fitted(model_ols2)[6:21], col=""red"", lwd=2)"

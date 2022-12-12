@@ -1,0 +1,270 @@
+---
+title: "R Notebook"
+output:
+  word_document: default
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r}
+library(nlme)
+```
+
+## DATA PREPARATION AND LOADING
+
+In this step, I used the RAW_us_confirmed_cases.csv file from the Kaggle repository of John Hopkins University COVID-19 data, the CDC dataset of masking mandates by county, and the New York Times mask compliance survey data. Links to these datasets will be provided in the ReadME file of these projects.
+
+I changed the granularity of the covid confirmed cases for Snohomish County in Washington State from day to month, which is the first column of the dataset below. The second column indicates the number of infections in each of the months of interest. The mask policy (level column) started in July 2020. The data indicates a change over time after the policy was introduced. It will be interesting to find out the level shift, whether it was a trend change, and what we can expect in the future. To answer all these, I will use interrupted time series analysis on this dataset to perform this experiment.
+```{r}
+# You can also do this in RStudio using the "Import Dataset" button
+data <- read.csv("snohomish_monthly_infections.csv",header=T)
+print(data)
+```
+
+## VISUALLY INSPECT DATA
+This is to help look for any data quality issues that might be a problem and assess whether linear trends will be realistic. There are four things that I am interested in looking out for in the data:
+
+1. Wild points
+2. Linear trends
+3. Co-interventions
+4. Other data quality issues
+
+The first section of the code below produces the initial line plot. I used the R command plot, which is the command to produce a chart. The two variables I plot against one another are time on the x-axis and infections on the y-axis. That is the outcome variable we are interested in. I named the y-axis "confirmed COVID-19 cases". The highest value in the data set is 65719, so I set limits from 0 to 66000. That means we get the full range of values. I labeled the X-axis month and created a line plot with the color red. In my code x-axis equals no (xaxt='n'); I do not want R to put numbers on the x-axis. And the reason is that I do not wish to see the numbers 1 through 21 on the x-axis. I want the actual months. So I'm saying to R, in the first instance, don't plot the x-axis. I added it using the following line of code. Next, I'm adding points, so I use the R command points. And I'm putting dots on each of the data points here to make it easier to follow.
+I use Abline, which produces a line on a plot at point 5.5. From our data, the first point after the mask policy mandate is 5095. This means that if I plot this line at 5094.5, that's going to leave the last point on the left and the next point on the right. The LTY equals 2 gives a dashed line, and this shows up in black on the chart.
+
+```{r}
+# Plot outcome variable versus time
+plot(data$time, data$infections,
+     main = "Covid-19 Infection Cases - Snohomish County: Feb 2020 - Oct 2021",
+     ylab = "Confirmed COVID-19 Cases",
+     ylim = c(0, 66000),
+     xlab = "month",
+     type = "l",
+     col = "red",
+     xaxt = "n")
+
+
+# Add x-axis month labels
+axis(1, at=1:21, labels = data$month)
+
+# Add in the points for the figure
+points(data$time, data$infections, col="red", pch=20)
+
+
+# Label the intervention start month
+abline(v=5.5, lty=2)
+
+```
+
+The plot shows a non-linear trend. There are two strategies to address this: quadratic model terms or differencing outcomes. In my experiment, I choose to use the quadratic model terms. Using the quadratic model term allows the linear shape to have some curve. Differencing outcomes can be used when a control group is used in the research project. 
+
+To set up the quadratic time trend, for intervention status j, at time t:
+
+$outcome_{jt} = \beta_0 + \beta_1.time_{t} + \beta_2.level_{j} + \beta_3.trend_{jt} + \beta_4.trend^2_{jt} +\epsilon_{jt}$ 
+
+$\beta_0 =$ existing level,   $\beta_1 =$ existing trend,  $\beta_2 =$ level change,  $\beta_3 + \beta_4 =$ trend change
+
+The addition of the quadratic term will make it harder to interpret. This is because I am not going to have a straight number that I can look at for the trend change, but I can add the two of them together, which is where predicting changes becomes quite useful.
+
+I updated my data by adding a new column which is the trend squared.
+
+
+
+## PRELIMINARY ANALYSIS
+In this step, I modeled a standard linear regression with a time series specification.
+
+```{r}
+# A preliminary OLS regression
+model_ols = lm(infections ~ time + level + trend + trendsq, data=data)
+
+# See summary of model output
+summary(model_ols)
+
+```
+The results from the estimate column show that the existing trend increased over time by approximately 883 per month. So every month, we see that the actual infection rate was increasing before. That value, however, is not statistically significant. So it is not statistically differentiable from zero. The next variable level shows us the projected impact of the masking policy mandate on the level of confirmed COVID-19 cases over time. And we can see a dramatic and substantial drop of approximately 9736 positive points per month in confirmed COVID-19 cases. This is also not statistically significant. Also, we can see that there is also a $trend$ and $trendsq$ increase of approximately 1881 and 68, respectively. However, that is not statistically different from 0 because of the p-values. This result shows a change in the level, which persists over time, and a corresponding upward change in the trend.
+
+It is important to take the model and assess whether or not there are issues with autocorrelation before running the final model.
+
+
+## AUTOCORRELATION
+
+```{r}
+## Checking for autocorolatoin
+
+# ACF Plots
+par(mfrow=c(2,1))
+
+#Produce plots
+acf(residuals(model_ols))
+acf(residuals(model_ols), type='partial')
+```
+
+I used the generalized least squares (gls) approach to run the final model. This is similar to linear regression but allows the inclusion of an autoregressive or moving average process in the model itself. The gls() function is in the library NLME, or the non-linear mixed effects library. This library was loaded at the start of the code. 
+
+I created the model called model_p0 with an ar3 process, or p equals 3. I put a tilde in front of the time since that is the variable the autocorrelation operates over. I finally set the method to maximum likelihood.
+
+## FINAL MODEL
+```{r}
+##Use AR(0) and MR(0) in the plot
+
+model_p0 <- gls(infections ~ time + level + trend + trendsq, 
+             data=data,
+             correlation=corARMA(p=3, form=~time),
+             method = "ML")
+summary(model_p0)
+```
+
+A couple of things to point out in the results above. The first thing that R reports is the actual model. It then goes through some statistics about the model fit. It tells the correlation structure, so ARMA(3,0). This is the autoregressive parameter. This is the moving average parameter. The formula for the correlation itself follows. R then reports all the 3 phi parameters that it's come up with. The coefficients are the results: the intercept, time, level, and trend.
+
+It can be inferred from the coefficients that, after the mask policy's introduction, there was a sustained drop in the monthly infection rate of approximately 845 people. However, the confirmed cases increased significantly, with about 2640 confirmed cases each month. 
+
+
+
+
+## PLOTTING THE RESULTS
+Now it's time to plot the results and get the raw data points. The Covid-19 confirmed cases are on the y-axis. I have set the limits on the y-axis to get all the data onto the chart. Both the y-axis and x-axis are well labeled, and I chose a circle as the plotting character. I decided to plot the pink so that the lines are a similar color to the plotted red lines but are a little bit dimmer. I completed the plot by putting in the observed lines.
+
+I used the fitted command in R. What fitted does is it gives you the predictions out of the model. The time points for the two lines represent the pre-period and the post-period fitted lines. I used the segments command to plot the counterfactual line. 
+```{r}
+#Plotting the Results
+
+plot(data$time, data$infections,
+     main = "Covid-19 Infection Cases - Snohomish County: Feb 2020 - Oct 2021",
+     ylab = "Confirmed COVID-19 Cases",
+     ylim =c(0, 66000),
+     xlab = "month",
+     pch = 20,
+     col = "pink",
+     xaxt="n")
+
+# Plot dates on x-axis
+axis(1, at=1:21, labels = data$month)
+
+# Add line indicating policy start date
+abline(v=5.5, lty="dotted")
+
+# Plot the first line segment
+lines(data$time[1:5], fitted(model_p0)[1:5], col="red", lwd=2)
+
+# Plot the second line segment
+lines(data$time[6:21], fitted(model_p0)[6:21], col="red", lwd=2)
+
+#Add the counterfactual
+segments(1, model_p0$coef[1]+model_p0$coef[2], 21,
+         model_p0$coef[1]+model_p0$coef[2]*21,
+         lty=2,
+         lwd=2,
+         col='red')
+
+```
+The plot above indicates the preexisting level and trend, the modeled level and trend after, and the counterfactual, which tells what the assumption is or essentially what the outcome would have been absent from the introduction of the mask mandate policy.
+
+
+## EXTENTION PLAN
+
+The purpose of the investigation is to steady the unemployment rate of the people living in the Snohomish County of Washington State from February 1, 2020, through to October 1, 2021, during the spread of the novel COVID-19, usually known as coronavirus. According to a report from the Census Bureau and Policy Priorities (CBPP), the COVID-19 pandemic and resulting economic fallout caused significant hardship. In the early months of the crisis, tens of millions of people lost their jobs. While employment began to rebound within a few months, unemployment remained high throughout 2020.
+
+In April 2020, the Census Bureau began the Household Pulse Survey to collect nearly real-time data on how families were faring during this unprecedented crisis. At the end of 2021, the Census Bureau had released data from 39 Pulse surveys on household well-being. The unemployment rate jumped in April 2020 to a level not seen since the 1930s — and stood at 4.9 percent in October 2021, compared with 3.5 percent in February 2020. That official unemployment rate, moreover, understated job losses.
+
+There were still 4.2 million fewer jobs in October 2021 than in February 2020. The majority of jobs lost in the crisis have been in industries that pay low average wages, with the lowest-paying industries accounting for 30 percent of all jobs but 59 percent of the jobs lost from February 2020 to October 2021, according to Labor Department employment data. Jobs were down nearly twice as much in low-paying industries (4.5 percent) as in medium-wage industries (2.6 percent) and roughly 15 times as much as in high-wage industries (0.3 percent) during this period. What is the story of the Snohomish County during this same period, and did the masking policy impact the rate of unemployment in anyway?
+
+
+```{r}
+# You can also do this in RStudio using the "Import Dataset" button
+unemployment_data <- read.csv("unemployment_rate.csv",header=T)
+print(unemployment_data)
+```
+
+
+```{r}
+# Plot outcome variable versus time
+plot(unemployment_data$time, unemployment_data$rate,
+     main = "Unemployment Rate - Snohomish County: Feb 2020 - Oct 2021",
+     ylab = "Unemployment rate",
+     ylim = c(0, 20),
+     xlab = "month",
+     type = "l",
+     col = "red",
+     xaxt = "n")
+
+
+# Add x-axis month labels
+axis(1, at=1:21, labels = unemployment_data$month)
+
+# Add in the points for the figure
+points(unemployment_data$time, unemployment_data$rate, col="red", pch=20)
+
+
+# Label the intervention start month
+abline(v=3.5, lty=2)
+
+```
+
+## PRELIMINARY ANALYSIS
+In this step, I modeled a standard linear regression with a time series specification.
+
+```{r}
+# A preliminary OLS regression
+model_ols2 = lm(rate ~ time + level + trend, data=unemployment_data)
+
+# See summary of model output
+summary(model_ols2)
+
+```
+
+```{r}
+#Plotting the Results
+
+plot(unemployment_data$time, unemployment_data$rate,
+     main = "Unemployment Rate - Snohomish County: Feb 2020 - Oct 2021",
+     ylab = "Unemployment rate",
+     ylim =c(0, 20),
+     xlab = "month",
+     pch = 20,
+     col = "pink",
+     xaxt="n")
+
+# Plot dates on x-axis
+axis(1, at=1:21, labels = unemployment_data$month)
+
+# Add line indicating policy start date
+abline(v=5.5, lty="dotted")
+
+# Plot the first line segment
+lines(unemployment_data$time[1:5], fitted(model_ols2)[1:5], col="red", lwd=2)
+
+# Plot the second line segment
+lines(unemployment_data$time[6:21], fitted(model_ols2)[6:21], col="red", lwd=2)
+
+#Add the counterfactual
+segments(1, model_ols2$coef[1]+model_ols2$coef[2], 21,
+         model_ols2$coef[1]+model_ols2$coef[2]*21,
+         lty=2,
+         lwd=2,
+         col='red')
+
+```
+
+
+
+
+## PREDICTING CHANGES
+In my final analysis, I decided to look at the difference between my predicted line and counterfactual at some point in the post period, to get an idea of what the intervention or what the policy did at a particular time. Given that the policy was implemented 10months after February 2020. As you can see from the plot above, because there is trend line tilts downward and the predicted counterfactual goes upward, the difference is going to grow as time goes on.
+
+```{r}
+# Predicted value at 10 months after the mask policy intervention
+pred <- fitted(model_ols2)[15]
+
+#Then estimate the counterfactual at the same time point
+cfac <- model_ols2$coef[1] + model_ols2$coef[2]*15
+
+# Absolute change at 10 months
+pred - cfac
+
+# Relative change at 10 months
+(pred - cfac) / cfac
+```
+
+For the absolute change, I tooke the predicted value and subtracted the counterfactual at that same time point. That will give an idea as to whether or not the value is increased or decreased. I took the relative change by taking the prediction minus the counterfactual and dividing it by the counterfactual, or the value I would have expected, which will give me a percentage increase or decrease relative to the counterfactual that I estimated.
+
+After calculating in R, the prediction minus the counterfactual at point 15, gave an estimate of negative 38.45. The relative change gave a drop of 86.96%. The interpretation here is that in the 10th month after the masking policy was introduced, the average montly unemployment rate was 38.45 percent less per month than would have been expected if the masking policy was not implemented. This represented a 86.96% reduction. 

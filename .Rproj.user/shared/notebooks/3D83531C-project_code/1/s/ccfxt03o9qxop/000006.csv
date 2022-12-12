@@ -1,0 +1,2 @@
+"0","# Add in the points for the figure"
+"0","points(data$time, data$infections, col=""red"", pch=20)"
