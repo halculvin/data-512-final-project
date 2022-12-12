@@ -1,6 +1,0 @@
-"0","#Add the counterfactual"
-"0","segments(1, model_p0$coef[1]+model_p0$coef[2], 21,"
-"0","         model_p0$coef[1]+model_p0$coef[2]*21,"
-"0","         lty=2,"
-"0","         lwd=2,"
-"0","         col='red')"

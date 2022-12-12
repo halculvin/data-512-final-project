@@ -1,2 +1,0 @@
-"0","# Add in the points for the figure"
-"0","points(unemployment_data$time, unemployment_data$rate, col=""red"", pch=20)"

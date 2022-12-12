@@ -1,2 +1,0 @@
-"0","# Plot the first line segment"
-"0","lines(data$time[1:5], fitted(model_p0)[1:5], col=""red"", lwd=2)"

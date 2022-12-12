@@ -1,3 +1,0 @@
-"0","# You can also do this in RStudio using the ""Import Dataset"" button"
-"0","data <- read.csv(""snohomish_monthly_infections.csv"",header=T)"
-"0","print(data)"
