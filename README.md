@@ -1,4 +1,4 @@
-# Human Centered Data Science - Project Part 1 - Common Analysis
+# Human Centered Data Science - Final Project
 
 ## About the Project
 The Snohomish County of Washington State implemented masking policies during the outbreak of the Covid pandemic. The aim was to reduce the progression of confirmed COVID-19 cases within the County. My objective was to evaluate the impact that the masking policy had on the progression of the COVID-19 virus and the effect that this policy had on unemployment rate.
